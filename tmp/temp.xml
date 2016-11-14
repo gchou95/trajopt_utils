@@ -1,0 +1,10 @@
+<environment>
+  <!-- ... other definitions ... -->
+  <physicsengine type="ode">
+    <odeproperties>
+      <friction>100000</friction>
+      <gravity>0 0 -150</gravity>
+      <selfcollision>1</selfcollision>
+    </odeproperties>
+  </physicsengine>
+</environment>
