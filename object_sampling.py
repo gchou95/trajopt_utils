@@ -21,68 +21,61 @@ def sampleFurniture(num, env, minExtents, maxExtents, furniture, names):
 	# Deal with self-collisions (check)
 	# Load upright, with rotations 0, 90, 180, 270 deg (check)
 	# minExtents, maxExtents are wrt the floor
-	try:
-		deleted = []
-		for i in range(min(num, len(furniture))):
-			env.Load(furniture[i])
-			ct = 0
-			while ct <= 5:
-				ct = ct+1
-				flag = False
-				theta = random.sample([0,np.pi/2,np.pi,3*np.pi/2],1)
-				rot = rotationMatrix(theta, 'z')
-				x_rand = random.uniform(minExtents[0], maxExtents[0])
-				y_rand = random.uniform(minExtents[1], maxExtents[1])
-				z_rand = random.uniform(minExtents[2], maxExtents[2])
-				trans = translationVector(x_rand, y_rand, z_rand)
-				transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
+	deleted = []
+	transforms = []
+	for i in range(min(num, len(furniture))):
+		env.Load(furniture[i])
+		ct = 0
+		while ct <= 5:
+			ct = ct+1
+			flag = False
+			theta = random.sample([0,np.pi/2,np.pi,3*np.pi/2],1)
+			rot = rotationMatrix(theta, 'z')
+			x_rand = random.uniform(minExtents[0], maxExtents[0])
+			y_rand = random.uniform(minExtents[1], maxExtents[1])
+			z_rand = random.uniform(minExtents[2], maxExtents[2])
+			trans = translationVector(x_rand, y_rand, z_rand)
+			transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
+			# pdb.set_trace()
+			for k in names[i]:
+				# get the names of all kinbodies in an xml
+				obj = env.GetKinBody(k)
 				# pdb.set_trace()
-				for k in names[i]:
-					# get the names of all kinbodies in an xml
-					obj = env.GetKinBody(k)
-					# pdb.set_trace()
-					obj.SetTransform(transform)
-				tempIdx = range(i)
-				for idx in range(i):
-					if idx in deleted:
-						tempIdx.remove(idx)
-				# pdb.set_trace()
-				for j in tempIdx:
-					for ii in range(len(names[i])):
-						for jj in range(len(names[j])):
-							# pdb.set_trace()
-							for k in names[i]:
-								# get the names of all kinbodies in an xml
-								obj = env.GetKinBody(k)
-								# pdb.set_trace()
-								obj.SetTransform(transform)
-							if env.CheckCollision(env.GetKinBody(names[i][ii]), env.GetKinBody(names[j][jj])):
-								flag = True
-								break
-						if flag:
+				obj.SetTransform(transform)
+			tempIdx = range(i)
+			for idx in range(i):
+				if idx in deleted:
+					tempIdx.remove(idx)
+			# pdb.set_trace()
+			for j in tempIdx:
+				for ii in range(len(names[i])):
+					for jj in range(len(names[j])):
+						# pdb.set_trace()
+						for k in names[i]:
+							# get the names of all kinbodies in an xml
+							obj = env.GetKinBody(k)
+							obj.SetTransform(transform)
+						if env.CheckCollision(env.GetKinBody(names[i][ii]), env.GetKinBody(names[j][jj])):
+							flag = True
 							break
 					if flag:
 						break
-				if not flag:
+				if flag:
 					break
-				if ct == 5:
-					# for kk in range(len(names[i])):
-					# 	env.Remove(env.GetKinBody(names[i][kk]))
-					deleted.append(i)
-				# pdb.set_trace()
-		for kk in deleted:
-			for kkk in range(len(names[kk])):
-				env.Remove(env.GetKinBody(names[kk][kkk]))
-	except:
-		type, value, tb = sys.exc_info()
-		traceback.print_exc()
-		last_frame = lambda tb=tb: last_frame(tb.tb_next) if tb.tb_next else tb
-		frame = last_frame().tb_frame
-		ns = dict(frame.f_globals)
-		ns.update(frame.f_locals)
-		code.interact(local=ns)
+			if not flag:
+				transforms.append(transform)
+				break
+			if ct == 5:
+				# for kk in range(len(names[i])):
+				# 	env.Remove(env.GetKinBody(names[i][kk]))
+				deleted.append(i)
+			# pdb.set_trace()
+	for kk in deleted:
+		for kkk in range(len(names[kk])):
+			env.Remove(env.GetKinBody(names[kk][kkk]))
+	return transforms
 
-def sampleObjects(num, env, minExtentsArr, maxExtentsArr):
+def sampleObjects(num, env, minExtentsArr, maxExtentsArr, transforms):
 	# Deal with self-collisions
 	# Deal with collisions with furniture
 	# for i in range(int(floor(num/len(furniture)))):
@@ -95,11 +88,11 @@ def sampleObjects(num, env, minExtentsArr, maxExtentsArr):
 				name = 'objects%d'%(ii*int(np.floor(num/2)) + i)
 				body.SetName(name) 
 				# Create random object
-				if random.uniform(0,1) > 0:
+				if random.uniform(0,1) > 0.5:
 					# pdb.set_trace()
-					xMin = random.uniform(0, np.abs(minExtentsArr[ii][0] - maxExtentsArr[ii][0]))
-					yMin = random.uniform(0, np.abs(minExtentsArr[ii][1] - maxExtentsArr[ii][1]))
-					zMin = random.uniform(0, np.abs(minExtentsArr[ii][2] - maxExtentsArr[ii][2]))
+					xMin = random.uniform(0, np.abs(minExtentsArr[ii][0] - maxExtentsArr[ii][0])/5)
+					yMin = random.uniform(0, np.abs(minExtentsArr[ii][1] - maxExtentsArr[ii][1])/5)
+					zMin = random.uniform(0, np.abs(minExtentsArr[ii][2] - maxExtentsArr[ii][2])/5)
 					body.InitFromBoxes(np.array([[0,0,0,xMin,yMin,zMin]]), True)
 				else:
 					# pdb.set_trace()
@@ -110,14 +103,22 @@ def sampleObjects(num, env, minExtentsArr, maxExtentsArr):
 				body.GetLinks()[0].SetPrincipalMomentsOfInertia([1,2,3]) 
 				body.GetLinks()[0].SetLocalMassFrame([1,0,0,0,1,1,1])
 				env.Add(body, True)
+				theta0 = np.arccos((np.trace(transforms[ii][0:3,0:3]) - 1)/2)
 				theta = random.sample([0,np.pi/2,np.pi,3*np.pi/2],1)
 				rot = rotationMatrix(theta, 'z')
+				print('theta0 = ')
+				print theta0
+				xyz0 = transforms[ii][0:3, 3]
+				# pdb.set_trace()
+				print('x0 = %d'%xyz0[0])
+				print('y0 = %d'%xyz0[1])
+				print('z0 = %d'%xyz0[2])
 				x_rand = random.uniform(minExtentsArr[ii][0], maxExtentsArr[ii][0])
 				y_rand = random.uniform(minExtentsArr[ii][1], maxExtentsArr[ii][1])
 				z_rand = random.uniform(minExtentsArr[ii][2], maxExtentsArr[ii][2])
 				trans = translationVector(x_rand, y_rand, z_rand)
 				transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
-				body.SetTransform(transform)
+				body.SetTransform(np.dot(transforms[ii], transform))
 				ct = 0
 				while ct <= 5:
 					flag = False
@@ -143,7 +144,7 @@ def sampleObjects(num, env, minExtentsArr, maxExtentsArr):
 					z_rand = random.uniform(minExtentsArr[ii][2], maxExtentsArr[ii][2])
 					trans = translationVector(x_rand, y_rand, z_rand)
 					transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
-					body.SetTransform(transform)
+					body.SetTransform(np.dot(transforms[ii], transform))
 						
 					# Collision check with all objects in environment
 	except:
@@ -220,7 +221,7 @@ xml_str = """<environment>
     </odeproperties>
   </physicsengine>
 </environment>"""
-fname = "/home/viki/my_trajopt/tmp/temp.xml"
+fname = "/home/viki/trajopt_utils/tmp/temp.xml"
 with open(fname,"w") as fh:
     fh.write(xml_str)
 
@@ -245,16 +246,16 @@ num_o = 5*num_f
 # Sample furniture
 # furn = []
 # pdb.set_trace()
-filenames = listdir('/home/viki/my_trajopt/furniture')
-minExtents, maxExtents = getExtents('/home/viki/my_trajopt/furniture')
-furniture = ['/home/viki/my_trajopt/furniture/' + name for name in filenames]
-names = getNames('/home/viki/my_trajopt/furniture')
+filenames = listdir('/home/viki/trajopt_utils/furniture')
+minExtents, maxExtents = getExtents('/home/viki/trajopt_utils/furniture')
+furniture = ['/home/viki/trajopt_utils/furniture/' + name for name in filenames]
+names = getNames('/home/viki/trajopt_utils/furniture')
 # pdb.set_trace()
-sampleFurniture(num_f, env, min(zip(floorExtents_x, floorExtents_y, floorExtents_z)), \
+transforms = sampleFurniture(num_f, env, min(zip(floorExtents_x, floorExtents_y, floorExtents_z)), \
 	max(zip(floorExtents_x, floorExtents_y, floorExtents_z)), furniture, names)
 # pdb.set_trace()
 # Sample objects
-sampleObjects(num_o, env, minExtents, maxExtents)
+sampleObjects(num_o, env, minExtents, maxExtents, transforms)
 
 # for i in range(0,5):
 # 	with env: 
