@@ -17,10 +17,11 @@ def rotationMatrix(theta, axis):
 def translationVector(x,y,z):
 	return np.array([[x],[y],[z]])
 
-def sampleFurniture(num, env, minExtents, maxExtents, furniture, names):
+def sampleFurniture(num, env, minExtents, maxExtents, furniture, names, angles, minExtentsArr, maxExtentsArr):
 	# Deal with self-collisions (check)
 	# Load upright, with rotations 0, 90, 180, 270 deg (check)
 	# minExtents, maxExtents are wrt the floor
+	# pdb.set_trace()
 	deleted = []
 	transforms = []
 	for i in range(min(num, len(furniture))):
@@ -29,12 +30,19 @@ def sampleFurniture(num, env, minExtents, maxExtents, furniture, names):
 		while ct <= 5:
 			ct = ct+1
 			flag = False
-			theta = random.sample([0,np.pi/2,np.pi,3*np.pi/2],1)
+			theta = random.sample(angles,1)
 			rot = rotationMatrix(theta, 'z')
-			x_rand = random.uniform(minExtents[0], maxExtents[0])
-			y_rand = random.uniform(minExtents[1], maxExtents[1])
-			z_rand = random.uniform(minExtents[2], maxExtents[2])
-			trans = translationVector(x_rand, y_rand, z_rand)
+			# x_rand = random.uniform(0.6*minExtents[0], 0.6*maxExtents[0])
+			# y_rand = random.uniform(0.6*minExtents[1], 0.6*maxExtents[1])
+			z_rand = random.uniform(0.6*minExtents[2], 0.6*maxExtents[2])
+			if i > 0:
+				xy_temp = selectTranslation(minExtentsArr[i-1:i+1], maxExtentsArr[i-1:i+1])
+				xy = xy_temp + transform[0:2, 3]
+				print xy
+			else:
+				xy = [random.uniform(0.6*minExtents[0], 0.6*maxExtents[0]), \
+					random.uniform(0.6*minExtents[1], 0.6*maxExtents[1])]
+			trans = translationVector(xy[0], xy[1], z_rand)
 			transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
 			# pdb.set_trace()
 			for k in names[i]:
@@ -75,44 +83,60 @@ def sampleFurniture(num, env, minExtents, maxExtents, furniture, names):
 			env.Remove(env.GetKinBody(names[kk][kkk]))
 	return transforms
 
-def sampleObjects(num, env, minExtentsArr, maxExtentsArr, transforms):
+def sampleObjects(numF, num, env, minExtentsArr, maxExtentsArr, transforms, angles):
 	# Deal with self-collisions
 	# Deal with collisions with furniture
 	# for i in range(int(floor(num/len(furniture)))):
 	try:
 		del_ct = 0
 		orig_num = len(env.GetBodies())
-		for ii in range(len(minExtentsArr)):
+		for ii in range(numF):
 			for i in range(int(np.floor(num/2))):
-				body = RaveCreateKinBody(env,'')
-				name = 'objects%d'%(ii*int(np.floor(num/2)) + i)
-				body.SetName(name) 
 				# Create random object
-				if random.uniform(0,1) > 0.5:
+				testnum = random.uniform(0,1)
+				if testnum < 0.25:
 					# pdb.set_trace()
+					body = RaveCreateKinBody(env,'')
+					name = 'objects%d'%(ii*int(np.floor(num/2)) + i)
+					body.SetName(name) 
 					xMin = random.uniform(0, np.abs(minExtentsArr[ii][0] - maxExtentsArr[ii][0])/5)
 					yMin = random.uniform(0, np.abs(minExtentsArr[ii][1] - maxExtentsArr[ii][1])/5)
 					zMin = random.uniform(0, np.abs(minExtentsArr[ii][2] - maxExtentsArr[ii][2])/5)
 					body.InitFromBoxes(np.array([[0,0,0,xMin,yMin,zMin]]), True)
-				else:
+				elif testnum < 0.5:
 					# pdb.set_trace()
-					body.InitFromSpheres(np.array([[0,0,0,random.uniform(0, \
-						min(maxExtentsArr[ii] - minExtentsArr[ii]))]]),True) 
+					body = RaveCreateKinBody(env,'')
+					name = 'objects%d'%(ii*int(np.floor(num/2)) + i)
+					body.SetName(name) 
+					radius = random.uniform(0, min(maxExtentsArr[ii] - minExtentsArr[ii]))/5
+					body.InitFromSpheres(np.array([[0,0,0,radius]]),True) 
+				elif testnum < 0.75:
+					env.Load('/home/viki/trajopt_utils/objects/mug1.kinbody.xml')
+					body = env.GetKinBody('mug')
+					name = 'mug%d-1'%(ii*int(np.floor(num/2)) + i)
+					body.SetName(name)
+				else:
+					env.Load('/home/viki/trajopt_utils/objects/mug2.kinbody.xml')
+					body = env.GetKinBody('mug2')
+					name = 'mug%d-2'%(ii*int(np.floor(num/2)) + i)
+					body.SetName(name)
+
 				# pdb.set_trace()
-				body.GetLinks()[0].SetMass(1) 
+				body.GetLinks()[0].SetMass(100) 
 				body.GetLinks()[0].SetPrincipalMomentsOfInertia([1,2,3]) 
 				body.GetLinks()[0].SetLocalMassFrame([1,0,0,0,1,1,1])
-				env.Add(body, True)
-				theta0 = np.arccos((np.trace(transforms[ii][0:3,0:3]) - 1)/2)
-				theta = random.sample([0,np.pi/2,np.pi,3*np.pi/2],1)
+				if testnum < 0.5:
+					env.Add(body, True)
+				# theta0 = np.arccos((np.trace(transforms[ii][0:3,0:3]) - 1)/2)
+				theta = random.sample(angles,1)
 				rot = rotationMatrix(theta, 'z')
-				print('theta0 = ')
-				print theta0
-				xyz0 = transforms[ii][0:3, 3]
-				# pdb.set_trace()
-				print('x0 = %d'%xyz0[0])
-				print('y0 = %d'%xyz0[1])
-				print('z0 = %d'%xyz0[2])
+				# print('theta0 = ')
+				# print theta0
+				# xyz0 = transforms[ii][0:3, 3]
+				# # pdb.set_trace()
+				# print('x0 = %d'%xyz0[0])
+				# print('y0 = %d'%xyz0[1])
+				# print('z0 = %d'%xyz0[2])
 				x_rand = random.uniform(minExtentsArr[ii][0], maxExtentsArr[ii][0])
 				y_rand = random.uniform(minExtentsArr[ii][1], maxExtentsArr[ii][1])
 				z_rand = random.uniform(minExtentsArr[ii][2], maxExtentsArr[ii][2])
@@ -132,6 +156,7 @@ def sampleObjects(num, env, minExtentsArr, maxExtentsArr, transforms):
 						if flag:
 							break
 					if not flag:
+						# dims.append()
 						break
 					if ct == 5:
 						env.Remove(env.GetKinBody(name))
@@ -156,6 +181,19 @@ def sampleObjects(num, env, minExtentsArr, maxExtentsArr, transforms):
 		ns.update(frame.f_locals)
 		code.interact(local=ns)
 
+def dragToGround(env, objects):
+	for ii in range(2):
+		for i in range(len(objects)):
+			while True:
+				oldTransform = objects[i].GetTransform()
+				newTransform = oldTransform
+				newTransform[2, 3] = oldTransform[2, 3] - 0.001
+				objects[i].SetTransform(newTransform)
+				print(newTransform)
+				if env.CheckCollision(objects[i]):
+					objects[i].SetTransform(oldTransform)
+					break
+
 def getExtent(folderpath, filepath):
 	# Return extent for one kinbody
 	tempEnv = Environment()
@@ -170,7 +208,7 @@ def getExtent(folderpath, filepath):
 		tempTransform[0:3, 3] = np.zeros(3)
 		obj.SetTransform(tempTransform)
 		bounds = obj.ComputeAABB()
-		limits = np.vstack([bounds.pos(), bounds.extents()])
+		limits = np.vstack([bounds.pos()-bounds.extents(), bounds.pos()+bounds.extents()])
 		minExtent.append(np.amin(limits, 0))
 		maxExtent.append(np.amax(limits, 0))
 	return np.amin(np.dstack(minExtent), 2), np.amax(np.dstack(maxExtent), 2)
@@ -208,70 +246,42 @@ def getNames(folderpath):
 		namesFolder.append(name)
 	return namesFolder
 
-env = Environment() # create openrave environment 
-env.SetViewer('qtcoin') # attach viewer (optional) 
-# env.Load('data/hanoi.env.xml') # load a simple scene 
-xml_str = """<environment>
-  <!-- ... other definitions ... -->
-  <physicsengine type="ode">
-    <odeproperties>
-      <friction>100000</friction>
-      <gravity>0 0 -150</gravity>
-      <selfcollision>1</selfcollision>
-    </odeproperties>
-  </physicsengine>
-</environment>"""
-fname = "/home/viki/trajopt_utils/tmp/temp.xml"
-with open(fname,"w") as fh:
-    fh.write(xml_str)
+def objectDensity(alpha, numF):
+	# alpha in (0,1)
+	numSamplesFurniture = int(np.floor(alpha*numF))
+	numSamplesObjects = numSamplesFurniture*5
+	return numSamplesFurniture, numSamplesObjects
 
-env.Load(fname)
-# env.GetPhysicsEngine().SetGravity([0,0,0]) 
-# env.GetPhysicsEngine().SetFriction(0.5)
-# raw_input("Press Enter to continue...")
+def objectClutter(beta):
+	# beta in (0,1)
+	MAX = 10
+	temp = np.asarray([0, np.pi/2, np.pi, 3*np.pi/2])
+	ct = 0
+	for i in range(int(np.floor(beta*MAX))):
+		ct = ct + 1
+		temp_shifted = temp + 2*np.pi/(temp.shape[0])
+		temp = np.sort(np.hstack([temp, (temp + temp_shifted)/2]))
+		if temp.shape[0] > beta*2048:
+			break
+	return temp
 
-# Create floor
-floor = RaveCreateKinBody(env, '')
-floorExtents_x = [0,10]
-floorExtents_y = [0,10]
-floorExtents_z = [0,0.01]
-floor.InitFromBoxes(np.array([[x for t in zip(floorExtents_x, floorExtents_y, floorExtents_z) \
-	for x in t]]), True)
-floor.SetName('floor')
-env.Add(floor,True)
+def selectTranslation(maxExtents, minExtents):
+	# element 1 is the first, 2 is the one to be placed
+	origMaxExtents = maxExtents[0]
+	origMinExtents = minExtents[0]
+	newMaxExtents = maxExtents[1]
+	newMinExtents = minExtents[1]
+	newSize = newMaxExtents - newMinExtents
+	newRadius = 1.05*max(newSize)
+	corners = [np.array([origMaxExtents[0],origMaxExtents[1]]) + np.array([newRadius, newRadius]), \
+		np.array([origMaxExtents[0],origMinExtents[1]]) + np.array([newRadius, -newRadius]), \
+		np.array([origMinExtents[0],origMaxExtents[1]]) + np.array([-newRadius, newRadius]), \
+		np.array([origMinExtents[0],origMinExtents[1]]) + np.array([-newRadius, -newRadius])]
+	print(corners)
+	idx = random.randint(0,3)
+	center = corners[idx]
+	return center
 
-num_f = 5
-num_o = 5*num_f
 
-# Sample furniture
-# furn = []
-# pdb.set_trace()
-filenames = listdir('/home/viki/trajopt_utils/furniture')
-minExtents, maxExtents = getExtents('/home/viki/trajopt_utils/furniture')
-furniture = ['/home/viki/trajopt_utils/furniture/' + name for name in filenames]
-names = getNames('/home/viki/trajopt_utils/furniture')
-# pdb.set_trace()
-transforms = sampleFurniture(num_f, env, min(zip(floorExtents_x, floorExtents_y, floorExtents_z)), \
-	max(zip(floorExtents_x, floorExtents_y, floorExtents_z)), furniture, names)
-# pdb.set_trace()
-# Sample objects
-sampleObjects(num_o, env, minExtents, maxExtents, transforms)
 
-# for i in range(0,5):
-# 	with env: 
-# 	    body = RaveCreateKinBody(env,'') 
-# 	    body.SetName('body%d'%i) 
-# 	    body.InitFromBoxes(np.array([[-3+i,1,1,0.1,0.2,0.3]]),True) 
-# 	    body.GetLinks()[0].SetMass(1) 
-# 	    body.GetLinks()[0].SetPrincipalMomentsOfInertia([1,2,3]) 
-# 	    body.GetLinks()[0].SetLocalMassFrame([1,0,0,0,1,1,1])
-
-# 	    env.Add(body,True) 
-# 	body.GetLinks()[0].SetStatic(False)
-# 	# raw_input("Press Enter to continue...")
-# time.sleep(0.5) # sleep 2 seconds (want to set this to be minimum st no collisions)
-
-# # env.GetPhysicsEngine().SetGravity([0,0,-1]) 
-# time.sleep(1) # sleep 2 seconds 
-# env.GetPhysicsEngine().SetGravity([0,0,-9.8]) 
-# time.sleep(1)
+# def chooseGravityObjects():

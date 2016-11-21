@@ -3,7 +3,7 @@
   <physicsengine type="ode">
     <odeproperties>
       <friction>100000</friction>
-      <gravity>0 0 -150</gravity>
+      <gravity>0 0 -10</gravity>
       <selfcollision>1</selfcollision>
     </odeproperties>
   </physicsengine>

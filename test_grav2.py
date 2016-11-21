@@ -40,3 +40,5 @@ time.sleep(0.5) # sleep 2 seconds (want to set this to be minimum st no collisio
 time.sleep(1) # sleep 2 seconds 
 # env.GetPhysicsEngine().SetGravity([0,0,-9.8]) 
 # time.sleep(1)
+for body in env.GetBodies():
+	body.GetLinks()[0].SetStatic(True)
