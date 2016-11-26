@@ -14,6 +14,14 @@ def rotationMatrix(theta, axis):
 		return np.array([[np.cos(theta),-np.sin(theta),0],[np.sin(theta),np.cos(theta),0],[0,0,1]])
 	else:
 		return
+
+def angleFromRotationMatrix(rot):
+	theta_x = np.arctan2(rot[2,1], rot[2,2])
+	theta_y = np.arctan2(-rot[2,0], np.sqrt(rot[2,1]**2 + rot[2,2]**2))
+	theta_z = np.arctan2(rot[1,0], rot[0,0])
+	return theta_z
+	# array([-0.047361  ,  1.78637727,  0.23222611])
+
 def translationVector(x,y,z):
 	return np.array([[x],[y],[z]])
 
@@ -26,23 +34,25 @@ def sampleFurniture(num, env, minExtents, maxExtents, furniture, names, angles, 
 	transforms = []
 	for i in range(min(num, len(furniture))):
 		env.Load(furniture[i])
+		if i == 0:
+			idx = 0
 		ct = 0
 		while ct <= 5:
 			ct = ct+1
 			flag = False
-			theta = random.sample(angles,1)
-			rot = rotationMatrix(theta, 'z')
 			# x_rand = random.uniform(0.6*minExtents[0], 0.6*maxExtents[0])
 			# y_rand = random.uniform(0.6*minExtents[1], 0.6*maxExtents[1])
 			z_rand = random.uniform(0.6*minExtents[2], 0.6*maxExtents[2])
 			if i > 0:
-				xy_temp = selectTranslation(minExtentsArr[i-1:i+1], maxExtentsArr[i-1:i+1])
+				xy_temp, idx, theta = selectTranslation(minExtentsArr[i-1:i+1], maxExtentsArr[i-1:i+1], theta, idx)
 				xy = xy_temp + transform[0:2, 3]
 				print xy
 			else:
 				xy = [random.uniform(0.6*minExtents[0], 0.6*maxExtents[0]), \
 					random.uniform(0.6*minExtents[1], 0.6*maxExtents[1])]
+				theta = random.sample(angles,1)[0]
 			trans = translationVector(xy[0], xy[1], z_rand)
+			rot = rotationMatrix(theta, 'z')
 			transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
 			# pdb.set_trace()
 			for k in names[i]:
@@ -99,9 +109,9 @@ def sampleObjects(numF, num, env, minExtentsArr, maxExtentsArr, transforms, angl
 					body = RaveCreateKinBody(env,'')
 					name = 'objects%d'%(ii*int(np.floor(num/2)) + i)
 					body.SetName(name) 
-					xMin = random.uniform(0, np.abs(minExtentsArr[ii][0] - maxExtentsArr[ii][0])/5)
-					yMin = random.uniform(0, np.abs(minExtentsArr[ii][1] - maxExtentsArr[ii][1])/5)
-					zMin = random.uniform(0, np.abs(minExtentsArr[ii][2] - maxExtentsArr[ii][2])/5)
+					xMin = random.uniform(0, np.abs(minExtentsArr[ii][0] - maxExtentsArr[ii][0])/8)
+					yMin = random.uniform(0, np.abs(minExtentsArr[ii][1] - maxExtentsArr[ii][1])/8)
+					zMin = random.uniform(0, np.abs(minExtentsArr[ii][2] - maxExtentsArr[ii][2])/8)
 					body.InitFromBoxes(np.array([[0,0,0,xMin,yMin,zMin]]), True)
 				elif testnum < 0.5:
 					# pdb.set_trace()
@@ -187,7 +197,7 @@ def dragToGround(env, objects):
 			while True:
 				oldTransform = objects[i].GetTransform()
 				newTransform = oldTransform
-				newTransform[2, 3] = oldTransform[2, 3] - 0.001
+				newTransform[2, 3] = oldTransform[2, 3] - 0.01
 				objects[i].SetTransform(newTransform)
 				print(newTransform)
 				if env.CheckCollision(objects[i]):
@@ -249,7 +259,7 @@ def getNames(folderpath):
 def objectDensity(alpha, numF):
 	# alpha in (0,1)
 	numSamplesFurniture = int(np.floor(alpha*numF))
-	numSamplesObjects = numSamplesFurniture*5
+	numSamplesObjects = numSamplesFurniture*50
 	return numSamplesFurniture, numSamplesObjects
 
 def objectClutter(beta):
@@ -265,7 +275,7 @@ def objectClutter(beta):
 			break
 	return temp
 
-def selectTranslation(maxExtents, minExtents):
+def selectTranslation(maxExtents, minExtents, thetaprev, idxprev):
 	# element 1 is the first, 2 is the one to be placed
 	origMaxExtents = maxExtents[0]
 	origMinExtents = minExtents[0]
@@ -278,9 +288,26 @@ def selectTranslation(maxExtents, minExtents):
 		np.array([origMinExtents[0],origMaxExtents[1]]) + np.array([-newRadius, newRadius]), \
 		np.array([origMinExtents[0],origMinExtents[1]]) + np.array([-newRadius, -newRadius])]
 	print(corners)
-	idx = random.randint(0,3)
+	if idxprev == 0:
+		# first round
+		# choices = [thetaprev + np.pi/2]
+		pdb.set_trace()
+		theta = thetaprev + 1*np.pi/2
+		idx = random.randint(0,3)
+	else:
+		# choices = [thetaprev + np.pi/2]
+		theta = thetaprev + 1*np.pi/2
+		idx = idxprev
+	# elif idxprev == 2:
+	# 	choices = [thetaprev + np.pi/2]
+	# 	theta = choices
+	# else:
+	# 	choices = [thetaprev + np.pi/2]
+	# 	theta = choices
+	
 	center = corners[idx]
-	return center
+	print center, idx, theta
+	return center, idx, theta
 
 
 
