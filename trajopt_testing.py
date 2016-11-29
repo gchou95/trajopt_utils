@@ -1,6 +1,7 @@
 from object_sampling import *
 import or_trajopt
 import trajoptpy.math_utils as mu
+import pdb
 
 class GraspTransform:
     def __init__(self,env,target):
@@ -89,9 +90,8 @@ def sample_base_positions(robot, num=5):
 def gen_init_trajs(robot, n_steps, start_joints, end_joints):
 	waypoint_step = (n_steps - 1)// 2
 	joint_waypoints = [(np.asarray(start_joints) + np.asarray(end_joints))/2]
-	if args.multi_init:
-		print 'using random initializations'
-		joint_waypoints.extend(sample_base_positions(robot, num=5))
+	print 'using random initializations'
+	joint_waypoints.extend(sample_base_positions(robot, num=10))
 	trajs = []
 	for i, waypoint in enumerate(joint_waypoints):
 		if i == 0:
@@ -104,7 +104,7 @@ def gen_init_trajs(robot, n_steps, start_joints, end_joints):
 	return trajs
 
 def planToJointPos(env, TPlanner, goal):
-
+	# pdb.set_trace()
 	# Initialization
 	robot = env.GetRobots()[0]
 	if str(robot.GetName()) == 'pr2':
@@ -113,38 +113,84 @@ def planToJointPos(env, TPlanner, goal):
 		manip = robot.GetManipulators()[0] 
 	robot.SetActiveDOFs(manip.GetArmIndices())
 
-	# Generate 20 random start configurations
+	# Generate 10 random start configurations
 	starts = []
 	minLims = robot.GetActiveDOFLimits()[0]
 	maxLims = robot.GetActiveDOFLimits()[1]
 
-	for i in range(20):
+	ct = 0
+	while ct < 20:
 		start = []
+		olddof = robot.GetActiveDOFValues()
 		for j in range(robot.GetActiveDOF()):
-			randJoint = random.uniform(minLims[j], maxLims[j])
+			if j == 0:
+				randJoint = random.uniform(-0.3, 0.3)
+			elif j == 3:
+				randJoint = random.uniform(-0.8, -0.2)
+			# else:
+			elif j == 4 or j == 6:
+				randJoint = random.uniform(-2*np.pi, 2*np.pi)
+			else:
+				randJoint = random.uniform(minLims[j]+0.01, maxLims[j]-0.01)
 			start.append(randJoint)
-		starts.append(start)
+		robot.SetActiveDOFValues(start)
+		if not env.CheckCollision(robot) and not robot.CheckSelfCollision():
+			starts.append(start)
+			ct += 1
+		else:
+			robot.SetActiveDOFValues(olddof)
 
+	# pdb.set_trace()
 	# Running TrajOpt on each start configuration, with multiple initializations
 	errors = []
+	trajs = []
+	# starts = [np.array([ 0.1       ,  0.1       ,  0.1       , -0.19999999,  0.        ,
+ #       -0.20000001,  0.10000001])] # for the cluttered start problem
+	# starts = [np.array([ -9.96991008e-02,   9.93469212e-01,   4.05354266e-01,
+ #         -5.11823993e-01,   4.34700273e+00,  -1.83598577e+00,
+ #         -5.08743365e+00])]
 	for start in starts:
 		er = []
-		robot.SetActiveDOFvalues(start)
+		tr = []
+		robot.SetActiveDOFValues(start)
+		print 'goal'
+		print goal
+		print robot.GetActiveDOFValues()
 		if env.CheckCollision(robot):
 			continue
 		else:
-			initializations = gen_init_trajs(robot, 10, start, goal)
+			initializations = gen_init_trajs(robot, 30, start, goal)
+			initializations.append(None)
+			# pdb.set_trace()
+			err = []
+			tra = []
 			for init in initializations:
-				err = []
+				e = []
+				t = []
+				traj = []
 				try:
-					TPlanner.PlanToConfiguration(robot, goal)
+					out = TPlanner.PlanToConfiguration(robot, goal, init)
+					# pdb.set_trace()
+					traj = out.GetAllWaypoints2D()
+					olddof = robot.GetActiveDOFValues()
+					for i in range(len(traj)):
+						robot.SetActiveDOFValues(traj[i])
+						if env.CheckCollision(robot):
+							print 'collided'
+							e = 'error: collision with environment'
+							break
+					robot.SetActiveDOFValues(olddof)
 				except Exception, e:
+					pdb.set_trace()
 					print e
+				tra.append(traj)
 				err.append(str(e))
-				if err == []:
-					break
+				# if e == []:
+					# break
 			er.append(err)
+			tr.append(tra)
 		errors.append(er)
+		trajs.append(tr)
 
 	# for idx in range(robot.GetActiveDOF()):
 	# 	toCheck = np.linspace(minLims[idx], maxLims[idx], 3)
@@ -154,7 +200,7 @@ def planToJointPos(env, TPlanner, goal):
 	# 		if env.CheckCollision(robot):
 	# 			continue
 
-	return errors
+	return errors, trajs, starts
 
 
 

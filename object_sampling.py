@@ -50,7 +50,9 @@ def sampleFurniture(num, env, minExtents, maxExtents, furniture, names, angles, 
 			else:
 				xy = [random.uniform(0.6*minExtents[0], 0.6*maxExtents[0]), \
 					random.uniform(0.6*minExtents[1], 0.6*maxExtents[1])]
-				theta = random.sample(angles,1)[0]
+				# hardcoding for now
+				# theta = random.sample(angles,1)[0]
+				theta = np.pi
 			trans = translationVector(xy[0], xy[1], z_rand)
 			rot = rotationMatrix(theta, 'z')
 			transform = np.vstack([np.hstack([rot, trans]), np.array([0,0,0,1])])
