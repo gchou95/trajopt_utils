@@ -121,11 +121,16 @@ for i in range(len(traj)):
   robot.SetActiveDOFValues(traj[i])
   if env.CheckCollision(robot):
   	print 'collided'
-  time.sleep(0.5)
+  time.sleep(0.07)
 
-np.save('trajrun6.txt',trajs)
-np.save('errorrun6.txt',errors)
-np.save('startrun6.txt',starts)
+np.save('finaltraj3SameTestSwitched.txt',trajs)
+np.save('finalerror3SameTestSwitched.txt',errors)
+np.save('finalstart3SameTestSwitched.txt',starts)
+np.save('finalinit3SameTestSwitched.txt',initializations)
+
+np.save('perturbedTrajBookshelf5.3coeff.100steps.txt',trajs)
+np.save('perturbedErrorBookshelf5.txt',errors)
+np.save('perturbedInitBookshelf5.txt',initializations)
 
 # pdb.set_trace()
 # # env.SetPhysicsEngine(RaveCreatePhysicsEngine(env, 'bullet'))
