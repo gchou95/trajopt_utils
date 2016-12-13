@@ -109,25 +109,6 @@ def gen_init_trajs(robot, n_steps, start_joints, end_joints):
 		trajs.append(inittraj)
 	return trajs
 
-def fix_init_trajs(robot, n_steps, start_joints, end_joints, old_traj):
-	waypoint_step = (n_steps - 1)// 2
-	joint_waypoints = []
-	print 'using random initializations'
-	joint_waypoints.extend(old_traj)
-	trajs = []
-	for i, waypoint in enumerate(joint_waypoints):
-		if i == 0:
-			inittraj = mu.linspace2d(start_joints, end_joints, n_steps)
-		else:
-			inittraj = np.empty((n_steps, robot.GetActiveDOF()))
-			inittraj[:waypoint_step+1] = mu.linspace2d(start_joints, waypoint, waypoint_step+1)
-			inittraj[waypoint_step:] = mu.linspace2d(waypoint, end_joints, n_steps - waypoint_step)
-		trajs.append(inittraj)
-	return trajs
-
-def getBestTraj(trajLib, start, goal):
-
-
 def planToJointPos(env, TPlanner, goals):
 	# pdb.set_trace()
 	# Initialization
