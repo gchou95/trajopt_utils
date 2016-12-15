@@ -97,7 +97,7 @@ def gen_init_trajs(robot, n_steps, start_joints, end_joints):
 	waypoint_step = (n_steps - 1)// 2
 	joint_waypoints = [(np.asarray(start_joints) + np.asarray(end_joints))/2]
 	print 'using random initializations'
-	joint_waypoints.extend(sample_base_positions(robot, num=7))
+	joint_waypoints.extend(sample_base_positions(robot, num=15))
 	trajs = []
 	for i, waypoint in enumerate(joint_waypoints):
 		if i == 0:
@@ -454,15 +454,14 @@ def perturbDOFOne(env, startKeep, limCoeff):
 		gridpoints = []
 		for j in range(len(dofs)):
 			jrange = np.linspace(max(limits[0][j], dofs[j] - limCoeff*(limits[1][j] - limits[0][j])), \
-				min(limits[1][j], dofs[j] + limCoeff*(limits[1][j] - limits[0][j])), 300)
+				min(limits[1][j], dofs[j] + limCoeff*(limits[1][j] - limits[0][j])), 7)
 			for k in jrange:
 				temp = np.copy(dofs)
 				temp[j] = k
 				robot.SetActiveDOFValues(temp)
 				if not env.CheckCollision(robot):
 					gridpoints.append(temp)
-				else:
-					robot.SetActiveDOFValues(initdofs)
+				robot.SetActiveDOFValues(initdofs)
 		allStarts.append(gridpoints)
 
 	return allStarts
@@ -470,3 +469,73 @@ def perturbDOFOne(env, startKeep, limCoeff):
 def testPerturb(env, TPlanner, allStarts, goals):
 	errors, trajs, starts, initializations = planToJointGivenStart(env, TPlanner, allStarts, goals)
 	return errors, trajs, initializations
+
+def generateCSpaceClose(env):
+	start = np.array([-0.4109886,  0.78315856, -1.61472456, -0.53761381, -4.85969928, -1.28727333, -2.66948551])
+	robot = env.GetRobot('pr2')
+	manip = robot.GetManipulator("rightarm")
+	robot.SetActiveDOFs(manip.GetArmIndices())
+	robot.SetActiveDOFValues(start)
+	robot.SetActiveManipulator('rightarm')
+	ikmodel = databases.inversekinematics.InverseKinematicsModel(robot,iktype=IkParameterization.Type.Transform6D)
+	if not ikmodel.load():
+	    ikmodel.autogenerate()
+	robot.SetActiveDOFs(manip.GetArmIndices())
+	Tgoal = manip.GetEndEffectorTransform()
+	errors = []
+	trajs = []
+	sol = manip.FindIKSolutions(Tgoal, IkFilterOptions.CheckEnvCollisions)
+	goals = [np.array([-0.11860579, -0.27078926, -2.53044859, -0.43059192,  4.75675355, -0.47717729, -2.1130558 ])]
+	TPlanner = or_trajopt.TrajoptPlanner()
+	# starts = [np.array([ 0.1       ,  0.1       ,  0.1       , -0.19999999,  0.        ,
+ #       -0.20000001,  0.10000001])] # for the cluttered start problem
+	# starts = [np.array([ -9.96991008e-02,   9.93469212e-01,   4.05354266e-01,
+ #         -5.11823993e-01,   4.34700273e+00,  -1.83598577e+00,
+ #         -5.08743365e+00])]
+	for goal in goals:
+		for i in range(len(sol)):
+			start = sol[i]
+			er = []
+			tr = []
+			robot.SetActiveDOFValues(start)
+			print 'goal'
+			print goal
+			print robot.GetActiveDOFValues()
+			if env.CheckCollision(robot):
+				continue
+			else:
+				initializations = gen_init_trajs(robot, 15, start, goal)
+				initializations.append(None)
+				# pdb.set_trace()
+				err = []
+				tra = []
+				for init in initializations:
+					e = []
+					t = []
+					traj = []
+					try:
+						out = TPlanner.PlanToConfiguration(robot, goal, init)
+						# pdb.set_trace()
+						traj = out.GetAllWaypoints2D()
+						olddof = robot.GetActiveDOFValues()
+						for i in range(len(traj)):
+							robot.SetActiveDOFValues(traj[i])
+							if env.CheckCollision(robot):
+								print 'collided'
+								e = 'error: collision with environment'
+								break
+						robot.SetActiveDOFValues(olddof)
+					except Exception, e:
+						pdb.set_trace()
+						print e
+					tra.append(traj)
+					err.append(str(e))
+					# if e == []:
+						# break
+				er.append(err)
+				tr.append(tra)
+			errors.append(er)
+			trajs.append(tr)
+	return errors, trajs, initializations
+	# need to generate a bunch of Tgoals close by
+	# for start in allStarts:

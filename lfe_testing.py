@@ -5,10 +5,17 @@ import operator
 global trajLib
 global startLib
 global goalLib
-global initLib
+
+def zero_runs(a):
+    # Create an array that is 1 where a is 0, and pad each end with an extra 0.
+    iszero = np.concatenate(([0], np.equal(a, 0).view(np.int8), [0]))
+    absdiff = np.abs(np.diff(iszero))
+    # Runs start and end where absdiff is 1.
+    ranges = np.where(absdiff == 1)[0].reshape(-1, 2)
+    return ranges
 
 def repairTrajectory(robot, n_steps, start_joints, end_joints, old_traj):
-	waypoint_step = (n_steps - 1)// 2
+	waypoint_step = (n_steps - 1)// len(old_traj)
 	joint_waypoints = []
 	print 'using random initializations'
 	# joint_waypoints.extend(old_traj)
@@ -16,14 +23,15 @@ def repairTrajectory(robot, n_steps, start_joints, end_joints, old_traj):
 	pdb.set_trace()
 	# inittraj[0:something] = mu.linspace2d(start_joints, old_traj[0])
 	trajs = []
+	# for i, waypoint in enumerate(joint_waypoints):
+	# 	if i == 0:
+	inittraj = mu.linspace2d(start_joints, end_joints, n_steps)
+		# else:
+			# inittraj = np.empty((n_steps, robot.GetActiveDOF()))
 	for i, waypoint in enumerate(joint_waypoints):
-		if i == 2493204:
-			inittraj = mu.linspace2d(start_joints, end_joints, n_steps)
-		else:
-			inittraj = np.empty((n_steps, robot.GetActiveDOF()))
-			inittraj[:waypoint_step+1] = mu.linspace2d(start_joints, waypoint, waypoint_step+1)
-			inittraj[waypoint_step:] = mu.linspace2d(waypoint, end_joints, n_steps - waypoint_step)
-		trajs.append(inittraj)
+		inittraj[:i*waypoint_step+1] = mu.linspace2d(joint_waypoints[i-1], waypoint, i*waypoint_step+1)
+			# inittraj[waypoint_step:] = mu.linspace2d(waypoint, end_joints, n_steps - waypoint_step)
+		# trajs.append(inittraj)
 	return trajs
 
 # def repairTrajectory(traj):
@@ -33,7 +41,6 @@ def globalSetup():
 	trajLib = []
 	startLib = []
 	goalLib = []
-	initLib = {}
 
 def addToLibrary(obj, tag):
 	if tag == 'traj':
@@ -45,9 +52,6 @@ def addToLibrary(obj, tag):
 	elif tag == 'goal':
 		# list of goals
 		goalLib.append(obj)
-	elif tag == 'init':
-		# keys: (trajIdx, initIndex), value: collision fraction
-		initLib[obj[0]] = obj[1]
 	return 
 
 def getBestTraj(trajLib, startLib, goalLib, initLib, start, goal):
@@ -88,6 +92,65 @@ def getBestTraj(trajLib, startLib, goalLib, initLib, start, goal):
 	# 	dist.append()
 
 	# DO (TRAJECTORY, START, GOAL, SUCCESS RATIO)
+
+def testLFEOne(env, TPlanner, allStarts, traj):
+	# Just planning off of one good trajectory
+	robot = env.GetRobots()[0]
+	if str(robot.GetName()) == 'pr2':
+		manip = robot.GetManipulator('rightarm')
+	else:
+		manip = robot.GetManipulators()[0] 
+	robot.SetActiveDOFs(manip.GetArmIndices())
+	errors = []
+	trajs = []
+	goals = [traj[-1]]
+	for goal in goals:
+		for start in allStarts[0]:
+			er = []
+			tr = []
+			robot.SetActiveDOFValues(start)
+			# print 'goal'
+			# print goal
+			print robot.GetActiveDOFValues()
+			if env.CheckCollision(robot):
+				continue
+			else:
+				traj[0] = start
+				initializations = [traj]
+				# pdb.set_trace()
+				err = []
+				tra = []
+				for init in initializations:
+					e = []
+					t = []
+					traj = []
+					try:
+						out = TPlanner.PlanToConfiguration(robot, goal, init)
+						# pdb.set_trace()
+						traj = out.GetAllWaypoints2D()
+						olddof = robot.GetActiveDOFValues()
+						for i in range(len(traj)):
+							robot.SetActiveDOFValues(traj[i])
+							if env.CheckCollision(robot):
+								print 'collided'
+								e = 'error: collision with environment'
+								break
+						robot.SetActiveDOFValues(olddof)
+					except Exception, e:
+						# pdb.set_trace()
+						e = 'error: collision with environment'
+						print e
+					tra.append(traj)
+					err.append(str(e))
+					# if e == []:
+						# break
+				er.append(err)
+				tr.append(tra)
+			errors.append(er)
+			trajs.append(tr)
+	return errors, trajs, initializations
+	# start = traj[0]
+	# allStarts = perturbDOFOne(env, start, limCoeff)
 
 def testLFE(env, TPlanner):
 
